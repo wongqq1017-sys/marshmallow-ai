@@ -10,6 +10,5 @@ export interface TtsConfig {
 export const TTS_CONFIG: TtsConfig = {
   useExternal: true,
   ttsProvider: 'edgeproxy',
-  apiEndpoint: 'https://marshmallow-temp-navy.vercel.app',
+  apiEndpoint: undefined,
 };
-
