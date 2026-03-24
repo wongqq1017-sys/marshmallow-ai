@@ -1,0 +1,7 @@
+{
+  "name": "Marshmallow AI - Your Confidence Companion real",
+  "description": "A warm and supportive AI-powered companion designed to help you build self-confidence through daily reflection and gentle conversation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

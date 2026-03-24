@@ -1,0 +1,24 @@
+{
+  "appId": "com.marshmallow.confidence",
+  "appName": "棉花糖夥伴",
+  "webDir": "dist",
+  "ios": {
+    "scheme": "棉花糖夥伴",
+    "path": "ios",
+    "webViewConfig": {
+      "allowsBackForwardNavigationGestures": false,
+      "suppressesIncrementalRendering": true,
+      "isScrollEnabled": true,
+      "backgroundColor": "#FFFDF5",
+      "viewport": {
+        "width": "device-width",
+        "initialScale": 1,
+        "maximumScale": 1,
+        "userScalable": "no"
+      }
+    }
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
