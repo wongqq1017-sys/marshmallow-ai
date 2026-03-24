@@ -1,5 +1,5 @@
+import { EdgeTTS } from 'edge-tts-universal';
 import { Language } from '../types';
-import { TTS_CONFIG } from '../services/ttsConfig';
 
 type TtsProvider = (
   text: string,
@@ -7,7 +7,66 @@ type TtsProvider = (
   hooks?: { onStart?: () => void; onEnd?: () => void }
 ) => Promise<void>;
 
-const MAX_TEXT_LENGTH = 500;
+// Edge TTS 語音映射
+const voiceMap: Record<string, string> = {
+  'zh-HK': 'zh-HK-HiuGaaiNeural',  // 粵語女聲
+  'zh-TW': 'zh-TW-HsiaoYuNeural',   // 台灣國語女聲
+  'zh-CN': 'zh-CN-XiaoxiaoNeural', // 大陸普通話女聲
+};
+
+// 獲取語言對應的 voice key
+const getVoiceKey = (language: Language): string => {
+  switch (language) {
+    case Language.ZH_HK:
+      return 'zh-HK';
+    case Language.ZH_TW:
+      return 'zh-TW';
+    default:
+      return 'zh-CN';
+  }
+};
+
+// Edge TTS 每次請求限制約 1000 字
+const MAX_TEXT_LENGTH = 800;
+
+const splitText = (text: string): string[] => {
+  if (!text || text.length === 0) return [];
+
+  const chunks: string[] = [];
+  let remaining = text.trim();
+
+  while (remaining.length > MAX_TEXT_LENGTH) {
+    // 嘗試在句號、逗號或空白處分割
+    let splitIndex = remaining.lastIndexOf('。', MAX_TEXT_LENGTH);
+    if (splitIndex <= 0) {
+      splitIndex = remaining.lastIndexOf('，', MAX_TEXT_LENGTH);
+    }
+    if (splitIndex <= 0) {
+      splitIndex = remaining.lastIndexOf(' ', MAX_TEXT_LENGTH);
+    }
+    if (splitIndex <= 0) {
+      splitIndex = remaining.lastIndexOf('？', MAX_TEXT_LENGTH);
+    }
+    if (splitIndex <= 0) {
+      splitIndex = remaining.lastIndexOf('！', MAX_TEXT_LENGTH);
+    }
+    if (splitIndex <= 0) {
+      splitIndex = MAX_TEXT_LENGTH;
+    }
+
+    const chunk = remaining.slice(0, splitIndex + 1).trim();
+    if (chunk) {
+      chunks.push(chunk);
+    }
+    remaining = remaining.slice(splitIndex + 1).trim();
+  }
+
+  if (remaining) {
+    chunks.push(remaining);
+  }
+
+  return chunks;
+};
 
 export const createEdgeProxyTtsProvider = (): TtsProvider => {
   return async (text, language, hooks) => {
@@ -15,52 +74,50 @@ export const createEdgeProxyTtsProvider = (): TtsProvider => {
 
     hooks?.onStart?.();
 
-    const apiUrl = TTS_CONFIG.apiEndpoint || 'https://wongqq1017-2103.vercel.app';
+    const voiceKey = getVoiceKey(language);
+    const voice = voiceMap[voiceKey] || voiceMap['zh-HK'];
+    const chunks = splitText(text);
 
-    // 文本太長時分段
-    let textToSpeak = text.trim();
-    if (textToSpeak.length > MAX_TEXT_LENGTH) {
-      textToSpeak = textToSpeak.substring(0, MAX_TEXT_LENGTH);
-    }
+    console.log(`Edge TTS: Using voice ${voice} for language ${language}`);
 
     try {
-      const response = await fetch(`${apiUrl}/api/tts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: textToSpeak,
-          voice: language === Language.ZH_HK ? 'zh-HK' : language === Language.ZH_TW ? 'zh-TW' : 'zh-CN',
-          speed: 0,
-        }),
-      });
+      const audioContext = new AudioContext();
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API error: ${response.status}`);
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+
+        // 使用 Edge TTS 合成音頻
+        const tts = new EdgeTTS(chunk, voice);
+        const result = await tts.synthesize();
+
+        // 將 Blob 轉換為 AudioBuffer
+        const arrayBuffer = await result.audio.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        // 播放音頻
+        await new Promise<void>((resolve) => {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+
+          if (i === chunks.length - 1) {
+            source.onended = () => resolve();
+          } else {
+            source.onended = () => {
+              setTimeout(resolve, 100);
+            };
+          }
+          source.start();
+        });
       }
 
-      // 直接播放音頻流
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      await new Promise<void>((resolve, reject) => {
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          resolve();
-        };
-        audio.onerror = (e) => {
-          URL.revokeObjectURL(audioUrl);
-          reject(e);
-        };
-        audio.play();
-      });
+      // 等待最後一個音頻播放完成
+      await new Promise(resolve => setTimeout(resolve, 300));
 
+      await audioContext.close();
       hooks?.onEnd?.();
     } catch (error) {
-      console.error('Edge TTS Proxy Error:', error);
+      console.error('Edge TTS Error:', error);
       hooks?.onEnd?.();
       throw error;
     }
