@@ -3628,8 +3628,8 @@ export default function App() {
         console.log('Cantonese.ai provider initialized (requires API key)');
         break;
       case 'edge':
-        setExternalTtsProvider(createEdgeTtsProvider());
-        console.log('Edge TTS provider initialized (NOT WORKING on iOS!)');
+        setExternalTtsProvider(createEdgeProxyTtsProvider());
+        console.log('Edge TTS provider initialized (free, supports Cantonese)');
         break;
       case 'qwen':
         setExternalTtsProvider(createQwenTtsProvider());
