@@ -3604,6 +3604,10 @@ export default function App() {
 
   // 初始化 TTS provider
   useEffect(() => {
+    console.log('[TTS Init] TTS_CONFIG:', JSON.stringify(TTS_CONFIG));
+    console.log('[TTS Init] useExternal:', TTS_CONFIG.useExternal);
+    console.log('[TTS Init] ttsProvider:', TTS_CONFIG.ttsProvider);
+
     if (!TTS_CONFIG.useExternal) {
       setExternalTtsProvider(null);
       console.log('Using browser TTS (no external provider)');
