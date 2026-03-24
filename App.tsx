@@ -3635,6 +3635,10 @@ export default function App() {
         setExternalTtsProvider(createQwenTtsProvider());
         console.log('Qwen WebSocket TTS provider initialized');
         break;
+      case 'edgeproxy':
+        setExternalTtsProvider(createEdgeProxyTtsProvider());
+        console.log('Edge Proxy TTS provider initialized (free, supports Cantonese)');
+        break;
       default:
         setExternalTtsProvider(null);
         console.log('Using browser TTS');
