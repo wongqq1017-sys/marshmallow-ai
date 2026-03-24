@@ -11,7 +11,7 @@ type TtsProvider = (
 const voiceMap: Record<string, string> = {
   'zh-HK': 'zh-HK-HiuGaaiNeural',  // 粵語女聲
   'zh-TW': 'zh-TW-HsiaoYuNeural',   // 台灣國語女聲
-  'zh-CN': 'zh-CN-XiaoxiaoNeural', // 大陸普通話女聲
+  'zh-CN': 'zh-CN-XiaoxiaoNeural',  // 大陸普通話女聲
 };
 
 // 獲取語言對應的 voice key
@@ -36,7 +36,6 @@ const splitText = (text: string): string[] => {
   let remaining = text.trim();
 
   while (remaining.length > MAX_TEXT_LENGTH) {
-    // 嘗試在句號、逗號或空白處分割
     let splitIndex = remaining.lastIndexOf('。', MAX_TEXT_LENGTH);
     if (splitIndex <= 0) {
       splitIndex = remaining.lastIndexOf('，', MAX_TEXT_LENGTH);
@@ -78,21 +77,26 @@ export const createEdgeProxyTtsProvider = (): TtsProvider => {
     const voice = voiceMap[voiceKey] || voiceMap['zh-HK'];
     const chunks = splitText(text);
 
-    console.log(`Edge TTS: Using voice ${voice} for language ${language}`);
+    console.log(`[Edge TTS] Using voice: ${voice}, language: ${language}, text length: ${text.length}`);
 
     try {
       const audioContext = new AudioContext();
 
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
+        console.log(`[Edge TTS] Synthesizing chunk ${i + 1}/${chunks.length}: "${chunk.substring(0, 30)}..."`);
 
         // 使用 Edge TTS 合成音頻
         const tts = new EdgeTTS(chunk, voice);
         const result = await tts.synthesize();
 
+        console.log(`[Edge TTS] Received audio blob, size: ${result.audio.size}`);
+
         // 將 Blob 轉換為 AudioBuffer
         const arrayBuffer = await result.audio.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        console.log(`[Edge TTS] Decoded audio buffer, duration: ${audioBuffer.duration}s`);
 
         // 播放音頻
         await new Promise<void>((resolve) => {
@@ -109,15 +113,16 @@ export const createEdgeProxyTtsProvider = (): TtsProvider => {
           }
           source.start();
         });
+
+        console.log(`[Edge TTS] Played chunk ${i + 1}/${chunks.length}`);
       }
 
-      // 等待最後一個音頻播放完成
       await new Promise(resolve => setTimeout(resolve, 300));
-
       await audioContext.close();
+      console.log('[Edge TTS] Done');
       hooks?.onEnd?.();
     } catch (error) {
-      console.error('Edge TTS Error:', error);
+      console.error('[Edge TTS] Error:', error);
       hooks?.onEnd?.();
       throw error;
     }
